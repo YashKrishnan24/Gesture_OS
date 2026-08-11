@@ -18,6 +18,7 @@
         "save_file": "save_file",
         "refresh_page": "refresh_page",
         "MyPinch": "volumeup",
-        "MyVolumeDown": "volumedown"
+        "MyVolumeDown": "volumedown",
+        "open hand": "playpause"
     }
 }
