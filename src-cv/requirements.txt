@@ -1,0 +1,8 @@
+opencv-python
+mediapipe
+pyautogui
+fastapi
+uvicorn
+numpy
+fastdtw
+scipy
