@@ -5,8 +5,6 @@
         "is_active": true
     },
     "mappings": {
-        "wake_sleep": "toggle_active",
-        "play_pause": "playpause",
         "next_track": "nexttrack",
         "prev_track": "prevtrack",
         "volume_up": "volumeup",
@@ -19,6 +17,7 @@
         "refresh_page": "refresh_page",
         "MyPinch": "volumeup",
         "MyVolumeDown": "volumedown",
-        "open hand": "playpause"
+        "open hand": "playpause",
+        "TwoFingerSwipe": "nexttrack"
     }
 }

@@ -25,7 +25,15 @@ import {
   RefreshCw,
   Video,
   Trash2,
-  Power
+  Power,
+  Copy,
+  Clipboard,
+  Undo,
+  ZoomIn,
+  ZoomOut,
+  Camera,
+  VolumeX,
+  Lock
 } from "lucide-react";
 
 const ACTIONS = [
@@ -40,6 +48,14 @@ const ACTIONS = [
   { id: "switch_window", label: "Switch Window", icon: <AppWindow className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
   { id: "save_file", label: "Save File", icon: <Save className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
   { id: "refresh_page", label: "Refresh Page", icon: <RefreshCw className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
+  { id: "copy", label: "Copy", icon: <Copy className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
+  { id: "paste", label: "Paste", icon: <Clipboard className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
+  { id: "undo", label: "Undo", icon: <Undo className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
+  { id: "zoom_in", label: "Zoom In", icon: <ZoomIn className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
+  { id: "zoom_out", label: "Zoom Out", icon: <ZoomOut className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
+  { id: "screenshot", label: "Screenshot", icon: <Camera className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
+  { id: "mute", label: "Mute", icon: <VolumeX className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
+  { id: "lock_screen", label: "Lock Screen", icon: <Lock className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
 ];
 
 const containerVariants = {

@@ -14,18 +14,25 @@ import shared_state
 def run_api():
     uvicorn.run("api:app", host="127.0.0.1", port=8081, reload=False)
 
+import ctypes
+
+def send_media_key(key_code):
+    ctypes.windll.user32.keybd_event(key_code, 0, 1, 0)
+    time.sleep(0.05)
+    ctypes.windll.user32.keybd_event(key_code, 0, 1 | 2, 0)
+
 def execute_os_action(action_name):
     print(f"[OS] Executing Action: {action_name}")
     if action_name == "playpause":
-        pyautogui.press("playpause")
+        send_media_key(0xB3)
     elif action_name == "nexttrack":
-        pyautogui.press("nexttrack")
+        send_media_key(0xB0)
     elif action_name == "prevtrack":
-        pyautogui.press("prevtrack")
+        send_media_key(0xB1)
     elif action_name == "volumeup":
-        pyautogui.press("volumeup")
+        send_media_key(0xAF)
     elif action_name == "volumedown":
-        pyautogui.press("volumedown")
+        send_media_key(0xAE)
     elif action_name == "scrollup":
         pyautogui.scroll(300)
     elif action_name == "scrolldown":
@@ -38,6 +45,22 @@ def execute_os_action(action_name):
         pyautogui.hotkey("ctrl", "s")
     elif action_name == "refresh_page":
         pyautogui.press("f5")
+    elif action_name == "copy":
+        pyautogui.hotkey("ctrl", "c")
+    elif action_name == "paste":
+        pyautogui.hotkey("ctrl", "v")
+    elif action_name == "undo":
+        pyautogui.hotkey("ctrl", "z")
+    elif action_name == "zoom_in":
+        pyautogui.hotkey("ctrl", "+")
+    elif action_name == "zoom_out":
+        pyautogui.hotkey("ctrl", "-")
+    elif action_name == "screenshot":
+        pyautogui.hotkey("win", "shift", "s")
+    elif action_name == "mute":
+        send_media_key(0xAD)
+    elif action_name == "lock_screen":
+        pyautogui.hotkey("win", "l")
 
 def main():
     api_thread = threading.Thread(target=run_api, daemon=True)
