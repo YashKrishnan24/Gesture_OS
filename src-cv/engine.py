@@ -71,10 +71,9 @@ def main():
     detector = vision.HandLandmarker.create_from_options(options)
 
     cap = cv2.VideoCapture(0)
-    recognizer = GestureRecognizer(dtw_threshold=12.0)
+    recognizer = GestureRecognizer(dtw_threshold=20.0)
     
-    cv2.namedWindow("GestureOS Engine", cv2.WINDOW_NORMAL)
-    print("[Engine] Started ML tracking...")
+    print("[Engine] Started ML tracking in background...")
 
     recording_buffer = []
     live_buffer = []
@@ -145,13 +144,13 @@ def main():
                 cv2.putText(image, f"Status: {status_text}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
                 cv2.putText(image, f"Templates Loaded: {sum(len(v) for v in recognizer.templates.values())}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-            cv2.imshow("GestureOS Engine", image)
+            # Stream to UI
+            ret, buffer = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 50])
+            if ret:
+                shared_state.latest_frame = buffer.tobytes()
 
-            if cv2.waitKey(5) & 0xFF == ord('q'):
-                break
     finally:
         cap.release()
-        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
