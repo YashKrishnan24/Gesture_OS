@@ -1,39 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  LayoutDashboard, 
-  Calendar, 
-  CheckSquare, 
-  BarChart2, 
-  Settings, 
-  Search, 
-  Bell, 
-  MoreHorizontal,
-  PlaySquare,
-  SkipForward,
-  SkipBack,
-  Volume2,
-  Volume1,
-  MousePointer2,
-  ArrowUp,
-  ArrowDown,
-  Monitor,
-  AppWindow,
-  Save,
-  RefreshCw,
-  Video,
-  Trash2,
-  Power,
-  Copy,
-  Clipboard,
-  Undo,
-  ZoomIn,
-  ZoomOut,
-  Camera,
-  VolumeX,
-  Lock
+  LayoutDashboard, Calendar, CheckSquare, BarChart2, Settings, 
+  Search, Bell, MoreHorizontal, PlaySquare, SkipForward, SkipBack, 
+  Volume2, Volume1, MousePointer2, ArrowUp, ArrowDown, Monitor, 
+  AppWindow, Save, RefreshCw, Video, Trash2, Power, Copy, Clipboard, 
+  Undo, ZoomIn, ZoomOut, Camera, VolumeX, Lock, X, Plus, User, Key, ChevronRight
 } from "lucide-react";
 
 const ACTIONS = [
@@ -58,27 +32,30 @@ const ACTIONS = [
   { id: "lock_screen", label: "Lock Screen", icon: <Lock className="w-5 h-5 text-gray-500 group-hover:text-black transition-colors" /> },
 ];
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05 }
-  },
-  exit: { opacity: 0 }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
+const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } }, exit: { opacity: 0 } };
+const itemVariants = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } } };
 
 export default function Home() {
+  // Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [authForm, setAuthForm] = useState({ username: "", password: "" });
+
+  // App State
   const [status, setStatus] = useState<any>(null);
   const [config, setConfig] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("dashboard");
 
+  // Modal State
+  const [isRecordingModalOpen, setIsRecordingModalOpen] = useState(false);
+  const [recordingAction, setRecordingAction] = useState<string | null>(null);
+  const [gestureNameInput, setGestureNameInput] = useState("");
+  const [isRecordingInProgress, setIsRecordingInProgress] = useState(false);
+  const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
+
   // Fetch Status Loop
   useEffect(() => {
+    if (!isAuthenticated) return;
     const interval = setInterval(() => {
       fetch("http://127.0.0.1:8081/api/status")
         .then((res) => res.json())
@@ -86,9 +63,19 @@ export default function Home() {
         .catch(() => setStatus({ status: "offline" }));
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated]);
 
-  // Fetch Config
+  // Handle Recording auto-close
+  useEffect(() => {
+    if (isRecordingInProgress && status && !status.is_recording) {
+      setIsRecordingInProgress(false);
+      setIsRecordingModalOpen(false);
+      setRecordingAction(null);
+      setGestureNameInput("");
+      fetchConfig();
+    }
+  }, [status, isRecordingInProgress]);
+
   const fetchConfig = () => {
     fetch("http://127.0.0.1:8081/api/config")
       .then(res => res.json())
@@ -97,23 +84,32 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (activeTab === "gestures" || activeTab === "settings" || activeTab === "dashboard") {
-      fetchConfig();
+    if (isAuthenticated) fetchConfig();
+  }, [activeTab, isAuthenticated]);
+
+  const handleAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authForm.username && authForm.password) {
+      setIsAuthenticated(true);
     }
-  }, [activeTab]);
+  };
 
-  const handleRecord = async (actionId: string) => {
-    const gestureName = prompt("Enter a name for this custom gesture (e.g., 'MySwipe'):");
-    if (!gestureName) return;
+  const openRecordModal = (actionId: string) => {
+    setRecordingAction(actionId);
+    setGestureNameInput("");
+    setIsRecordingInProgress(false);
+    setIsRecordingModalOpen(true);
+  };
 
+  const startRecording = async () => {
+    if (!gestureNameInput.trim() || !recordingAction) return;
     try {
-      const res = await fetch("http://127.0.0.1:8081/api/record", {
+      await fetch("http://127.0.0.1:8081/api/record", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gesture_id: gestureName, os_action: actionId }),
+        body: JSON.stringify({ gesture_id: gestureNameInput.trim(), os_action: recordingAction }),
       });
-      const data = await res.json();
-      alert(data.message);
+      setIsRecordingInProgress(true);
     } catch (e) {
       alert("Failed to connect to engine.");
     }
@@ -121,14 +117,13 @@ export default function Home() {
 
   const handleDeleteGesture = async (gestureId: string) => {
     if (!confirm(`Are you sure you want to delete gesture '${gestureId}'?`)) return;
-    
     try {
       await fetch("http://127.0.0.1:8081/api/config/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gesture_id: gestureId })
       });
-      fetchConfig(); // Refresh
+      fetchConfig();
     } catch (e) {
       alert("Failed to delete gesture.");
     }
@@ -148,257 +143,316 @@ export default function Home() {
     }
   };
 
-  // Views
-  const renderDashboard = () => (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" exit="exit" className="space-y-10">
-      {/* Top Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div variants={itemVariants} whileHover={{ y: -4, scale: 1.01 }} className="lg:col-span-1 bg-[#1a1a1a] text-white rounded-[2rem] p-7 shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-white/10 to-transparent rounded-bl-full opacity-50 transition-transform duration-700 group-hover:scale-110"></div>
-          <div className="flex justify-between items-center mb-8 relative z-10">
-            <h2 className="text-lg font-medium text-gray-200">Engine Status</h2>
-            <motion.div whileHover={{ rotate: 90 }} className="cursor-pointer p-1">
-              <MoreHorizontal className="w-5 h-5 text-gray-400" />
-            </motion.div>
-          </div>
-
-          <div className="flex items-end space-x-4 mb-10 relative z-10">
-            <span className="text-7xl font-extrabold tracking-tighter">
-              {config ? Object.keys(config.mappings || {}).length : 0}
-            </span>
-            <span className="text-gray-400 text-sm pb-2 leading-tight w-24 font-medium">gestures recorded</span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 relative z-10">
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 flex flex-col items-center justify-center border border-white/5 transition-colors hover:bg-white/10">
-              <div className={`w-3 h-3 rounded-full mb-2 ${status?.status === 'offline' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]'}`}></div>
-              <span className="text-xs font-medium text-gray-300">{status?.status === 'offline' ? 'Offline' : 'Online'}</span>
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center font-[family-name:var(--font-geist-sans)] relative overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-tr from-blue-500/20 to-purple-500/20 rounded-full blur-3xl opacity-50 animate-pulse"></div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/10 backdrop-blur-2xl p-10 rounded-[2.5rem] w-full max-w-md border border-white/10 shadow-2xl relative z-10">
+          <div className="flex items-center justify-center mb-8 space-x-3">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg">
+              <Video className="w-6 h-6 text-black" />
             </div>
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 flex flex-col items-center justify-center border border-white/5 transition-colors hover:bg-white/10">
-              <MousePointer2 className="w-5 h-5 mb-2 text-gray-300" />
-              <span className="text-xs font-medium text-gray-300">Tracking</span>
-            </div>
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 flex flex-col items-center justify-center border border-white/5 transition-colors hover:bg-white/10">
-              <span className="font-bold text-lg mb-1">{status?.is_recording ? 'Rec' : (status?.is_active ? 'Active' : 'Paused')}</span>
-              <span className="text-xs font-medium text-gray-400">State</span>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div variants={itemVariants} whileHover={{ y: -4, scale: 1.01 }} className="lg:col-span-2 bg-white rounded-[2rem] p-7 shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-gray-100 to-transparent rounded-full blur-3xl opacity-50 -mr-20 -mt-20 transition-transform duration-700 group-hover:scale-110"></div>
-            <div className="flex justify-between items-center mb-6 relative z-10">
-            <h2 className="text-lg font-semibold text-gray-800">Live Activity</h2>
-            <span className="bg-gray-50 border border-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-full font-medium flex items-center space-x-2 shadow-sm">
-              <div className={`w-2 h-2 rounded-full ${status?.is_recording ? 'bg-red-500 animate-pulse' : (status?.is_active ? 'bg-green-500' : 'bg-orange-500')}`}></div>
-              <span>{status?.is_recording ? "Recording in progress..." : (status?.is_active ? "Listening..." : "Engine Paused")}</span>
-            </span>
+            <h1 className="text-3xl font-extrabold text-white tracking-tight">GestureOS</h1>
           </div>
           
-          <div className="flex-1 bg-[#f9fafb] rounded-[1.5rem] border border-gray-200 border-dashed flex items-center justify-center relative z-10 transition-colors group-hover:bg-[#f3f4f6]">
-              <AnimatePresence mode="wait">
-                {status?.is_recording ? (
-                  <motion.div 
-                    key="recording"
-                    initial={{ opacity: 0, scale: 0.9 }} 
-                    animate={{ opacity: 1, scale: 1 }} 
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="text-center"
-                  >
-                    <motion.div 
-                      animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
-                      className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-100"
-                    >
-                      <Video className="w-8 h-8" />
-                    </motion.div>
-                    <h3 className="font-bold text-xl text-gray-900">Perform Gesture Now</h3>
-                    <p className="text-gray-500 text-sm mt-1 font-medium">Recording '{status?.recording_gesture}'</p>
-                  </motion.div>
-                ) : (
-                  <motion.div 
-                    key="listening"
-                    initial={{ opacity: 0, scale: 0.9 }} 
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="text-center"
-                  >
-                    <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                      <LayoutDashboard className="w-8 h-8" />
-                    </div>
-                    <h3 className="font-medium text-gray-600">
-                      {status?.is_active ? "Camera running in background daemon" : "Engine is currently paused."}
-                    </h3>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+          <div className="flex bg-white/5 rounded-full p-1 mb-8">
+            <button onClick={() => setIsLoginMode(true)} className={`flex-1 py-2 rounded-full text-sm font-semibold transition-colors ${isLoginMode ? 'bg-white text-black shadow' : 'text-gray-400 hover:text-white'}`}>Login</button>
+            <button onClick={() => setIsLoginMode(false)} className={`flex-1 py-2 rounded-full text-sm font-semibold transition-colors ${!isLoginMode ? 'bg-white text-black shadow' : 'text-gray-400 hover:text-white'}`}>Register</button>
           </div>
+
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input type="text" placeholder="Username" required value={authForm.username} onChange={e => setAuthForm({...authForm, username: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all" />
+            </div>
+            <div className="relative">
+              <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input type="password" placeholder="Password" required value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-white placeholder-gray-500 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all" />
+            </div>
+            <button type="submit" className="w-full bg-white text-black font-bold py-3.5 rounded-2xl mt-4 hover:bg-gray-100 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.2)] flex items-center justify-center space-x-2">
+              <span>{isLoginMode ? 'Sign In' : 'Create Account'}</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </form>
         </motion.div>
       </div>
-
-      <div>
-        <motion.h2 variants={itemVariants} className="text-xl font-bold mb-6 flex justify-between items-center text-gray-900">
-          Map Gestures to Actions
-          <span className="text-sm font-medium text-gray-400 flex items-center cursor-pointer hover:text-gray-600 transition-colors">
-            Sort by <ArrowDown className="w-4 h-4 ml-1" />
-          </span>
-        </motion.h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {ACTIONS.map((action) => (
-            <motion.div 
-              variants={itemVariants}
-              whileHover={{ y: -6, scale: 1.02 }}
-              key={action.id} 
-              className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:border-gray-200 transition-all duration-300 relative group flex flex-col justify-between h-48"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-gray-50 rounded-[1rem] flex items-center justify-center border border-gray-100 group-hover:bg-black group-hover:text-white transition-colors duration-300 shadow-sm">
-                  {action.icon}
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold text-lg text-gray-900 mb-4">{action.label}</h3>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => handleRecord(action.id)}
-                  disabled={status?.is_recording}
-                  className="w-full bg-[#f9fafb] border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-semibold hover:bg-black hover:text-white hover:border-black transition-colors shadow-sm disabled:bg-gray-100 disabled:text-gray-400 flex items-center justify-center space-x-2"
-                >
-                  <span>Record</span>
-                  <Video className="w-3.5 h-3.5" />
-                </motion.button>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-
-  const renderGestures = () => (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" exit="exit">
-      <motion.h2 variants={itemVariants} className="text-3xl font-bold mb-8 text-gray-900">My Gestures</motion.h2>
-      <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100">
-        {!config || !config.mappings || Object.keys(config.mappings).length === 0 ? (
-          <p className="text-gray-500">No gestures recorded yet. Go to the dashboard to map some!</p>
-        ) : (
-          <div className="space-y-4">
-            {Object.entries(config.mappings).map(([gesture, actionId], i) => (
-              <motion.div variants={itemVariants} key={i} className="flex items-center justify-between p-5 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center space-x-4">
-                  <div className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center font-bold">
-                    {gesture.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg">{gesture}</h3>
-                    <p className="text-sm text-gray-500 font-medium">Mapped to OS Action: <span className="text-black">{String(actionId)}</span></p>
-                  </div>
-                </div>
-                <motion.button 
-                  whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                  onClick={() => handleDeleteGesture(gesture)}
-                  className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </motion.button>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
-    </motion.div>
-  );
-
-  const renderSettings = () => (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" exit="exit">
-      <motion.h2 variants={itemVariants} className="text-3xl font-bold mb-8 text-gray-900">Settings</motion.h2>
-      <motion.div variants={itemVariants} className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 max-w-2xl">
-        <div className="flex items-center justify-between mb-8 pb-8 border-b border-gray-100">
-          <div>
-            <h3 className="text-lg font-bold">Engine Status</h3>
-            <p className="text-gray-500 text-sm">Pause or resume the background ML python daemon.</p>
-          </div>
-          <button 
-            onClick={handleToggleEngine}
-            className={`px-6 py-3 rounded-full font-bold flex items-center space-x-2 transition-colors ${status?.is_active ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}
-          >
-            <Power className="w-5 h-5" />
-            <span>{status?.is_active ? "Pause Engine" : "Resume Engine"}</span>
-          </button>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold">Cooldown Threshold</h3>
-            <p className="text-gray-500 text-sm">Time required between gesture recognitions.</p>
-          </div>
-          <div className="bg-gray-100 px-4 py-2 rounded-lg font-mono font-medium text-gray-700">
-            {config?.settings?.cooldown || 1.0}s
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6] text-[#111827] flex font-[family-name:var(--font-geist-sans)] selection:bg-black selection:text-white">
+    <div className="min-h-screen bg-[#f3f4f6] text-[#111827] flex font-[family-name:var(--font-geist-sans)] selection:bg-black selection:text-white relative">
       {/* Sidebar */}
-      <motion.aside 
-        initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 200, damping: 20 }}
-        className="w-64 bg-white/70 backdrop-blur-xl border-r border-gray-200/50 flex flex-col p-6 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 relative"
-      >
+      <motion.aside initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="w-64 bg-white/70 backdrop-blur-xl border-r border-gray-200/50 flex flex-col p-6 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 relative">
         <div className="flex items-center space-x-3 mb-10 cursor-pointer">
-          <motion.div whileHover={{ rotate: 180 }} transition={{ duration: 0.4 }} className="w-8 h-8 rounded-xl bg-black flex items-center justify-center shadow-lg shadow-black/20">
+          <div className="w-8 h-8 rounded-xl bg-black flex items-center justify-center shadow-lg shadow-black/20">
             <Video className="w-4 h-4 text-white" />
-          </motion.div>
+          </div>
           <span className="font-bold text-xl tracking-tight">GestureOS</span>
         </div>
-
         <nav className="flex-1 space-y-2">
           <SidebarItem icon={<LayoutDashboard />} label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           <SidebarItem icon={<CheckSquare />} label="My Gestures" active={activeTab === 'gestures'} onClick={() => setActiveTab('gestures')} />
-          <SidebarItem icon={<Calendar />} label="Automations" active={activeTab === 'automations'} onClick={() => {}} disabled />
-          <SidebarItem icon={<BarChart2 />} label="Statistics" active={activeTab === 'stats'} onClick={() => {}} disabled />
+          <SidebarItem icon={<Calendar />} label="Automations" active={activeTab === 'automations'} onClick={() => setActiveTab('automations')} />
+          <SidebarItem icon={<BarChart2 />} label="Statistics" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} />
         </nav>
-
         <div className="mt-auto">
           <SidebarItem icon={<Settings />} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
         </div>
       </motion.aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        <motion.header 
-          initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-          className="flex justify-between items-center mb-10"
-        >
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-            {activeTab === 'dashboard' ? 'Overview' : activeTab === 'gestures' ? 'Gestures' : 'Settings'}
+      <main className="flex-1 p-8 overflow-y-auto relative z-0">
+        <motion.header initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex justify-between items-center mb-10">
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900 capitalize">
+            {activeTab}
           </h1>
           <div className="flex items-center space-x-4">
-            <motion.button onClick={() => alert("Coming soon!")} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-medium shadow-[0_8px_16px_rgba(0,0,0,0.15)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.2)] transition-shadow">
+            <button onClick={() => setIsMacroModalOpen(true)} className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-medium shadow-[0_8px_16px_rgba(0,0,0,0.15)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.2)] transition-shadow">
               + Add Macro
-            </motion.button>
-            <motion.div whileHover={{ scale: 1.05, backgroundColor: "#f9fafb" }} whileTap={{ scale: 0.95 }} className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 cursor-pointer transition-colors">
+            </button>
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
               <Search className="w-5 h-5 text-gray-600" />
-            </motion.div>
-            <motion.div whileHover={{ scale: 1.05, backgroundColor: "#f9fafb" }} whileTap={{ scale: 0.95 }} className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 relative cursor-pointer transition-colors">
+            </div>
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 relative cursor-pointer hover:bg-gray-50 transition-colors">
               <Bell className="w-5 h-5 text-gray-600" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </motion.div>
+            </div>
           </div>
         </motion.header>
 
         <AnimatePresence mode="wait">
-          {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'gestures' && renderGestures()}
-          {activeTab === 'settings' && renderSettings()}
-        </AnimatePresence>
+          {activeTab === 'dashboard' && (
+            <motion.div key="dash" variants={containerVariants} initial="hidden" animate="show" exit="exit" className="space-y-8">
+              {/* Perfectly Aligned Top Section */}
+              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                
+                {/* Live Camera View (Dominant) */}
+                <motion.div variants={itemVariants} className="xl:col-span-3 bg-black rounded-[2rem] p-1 shadow-2xl relative overflow-hidden h-[500px] flex flex-col group">
+                  <div className="absolute top-4 left-4 z-20 flex space-x-2">
+                    <span className="bg-black/50 backdrop-blur-md border border-white/10 text-white text-xs px-3 py-1.5 rounded-full font-medium flex items-center space-x-2">
+                      <div className={`w-2 h-2 rounded-full ${status?.is_recording ? 'bg-red-500 animate-pulse' : (status?.is_active ? 'bg-green-500' : 'bg-orange-500')}`}></div>
+                      <span>{status?.is_recording ? "Recording..." : (status?.is_active ? "Live Tracking" : "Paused")}</span>
+                    </span>
+                  </div>
+                  
+                  <div className="flex-1 w-full h-full relative rounded-[1.8rem] overflow-hidden bg-gray-900 border border-white/10">
+                    {status?.is_active ? (
+                      <img src="http://127.0.0.1:8081/api/video_feed" alt="Camera Feed" className="absolute inset-0 w-full h-full object-cover" />
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
+                        <Video className="w-12 h-12 mb-4 opacity-50" />
+                        <p>Camera is paused</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
 
+                {/* Stats Sidebar */}
+                <motion.div variants={itemVariants} className="xl:col-span-1 bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col gap-4 h-[500px]">
+                  <div className="bg-[#1a1a1a] text-white rounded-3xl p-6 flex-1 flex flex-col justify-between relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full"></div>
+                    <div>
+                      <h3 className="text-gray-400 font-medium text-sm mb-1">Total Gestures</h3>
+                      <div className="text-5xl font-bold">{config ? Object.keys(config.mappings || {}).length : 0}</div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-gray-400">Engine</span>
+                        <span className={status?.status === 'online' ? 'text-green-400' : 'text-red-400'}>{status?.status || 'Loading'}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-400">Tracking</span>
+                        <span className={status?.is_active ? 'text-blue-400' : 'text-orange-400'}>{status?.is_active ? 'Active' : 'Paused'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={handleToggleEngine} className={`w-full py-4 rounded-3xl font-bold flex items-center justify-center space-x-2 transition-colors ${status?.is_active ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
+                    <Power className="w-5 h-5" />
+                    <span>{status?.is_active ? "Pause Engine" : "Start Engine"}</span>
+                  </button>
+                </motion.div>
+              </div>
+
+              {/* Action Grid */}
+              <div>
+                <motion.h2 variants={itemVariants} className="text-xl font-bold mb-6 text-gray-900 flex justify-between items-center">
+                  Available Actions
+                </motion.h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                  {ACTIONS.map((action) => (
+                    <motion.div variants={itemVariants} whileHover={{ y: -4 }} key={action.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 group hover:border-gray-300 transition-all flex flex-col justify-between h-40">
+                      <div className="flex justify-between items-start">
+                        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-100 group-hover:bg-black group-hover:text-white transition-colors">
+                          {action.icon}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm text-gray-900 mb-3 truncate">{action.label}</h3>
+                        <button onClick={() => openRecordModal(action.id)} className="w-full bg-gray-50 hover:bg-black hover:text-white text-gray-700 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center space-x-1">
+                          <Plus className="w-3 h-3" />
+                          <span>Map Gesture</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'gestures' && (
+            <motion.div key="gestures" variants={containerVariants} initial="hidden" animate="show" exit="exit">
+              <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100">
+                {!config || !config.mappings || Object.keys(config.mappings).length === 0 ? (
+                  <div className="text-center py-10 text-gray-500">No gestures mapped yet.</div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {Object.entries(config.mappings).map(([gesture, actionId], i) => (
+                      <motion.div variants={itemVariants} key={i} className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 hover:bg-gray-50">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center font-bold text-gray-800 text-lg">
+                            {gesture.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-gray-900">{gesture}</h3>
+                            <p className="text-xs text-gray-500 font-medium mt-0.5">Triggers <span className="text-black font-semibold bg-gray-200 px-1.5 py-0.5 rounded ml-1">{String(actionId)}</span></p>
+                          </div>
+                        </div>
+                        <button onClick={() => handleDeleteGesture(gesture)} className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'automations' && (
+            <motion.div key="automations" variants={containerVariants} initial="hidden" animate="show" exit="exit" className="bg-white rounded-[2rem] p-10 text-center shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[400px]">
+              <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mb-6">
+                <Calendar className="w-10 h-10" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Automations Builder</h2>
+              <p className="text-gray-500 max-w-md mx-auto mb-8">Chain multiple OS actions together to create complex workflows triggered by a single hand gesture.</p>
+              <button className="bg-black text-white px-6 py-3 rounded-full font-bold shadow-lg hover:shadow-xl transition-shadow">Create Automation</button>
+            </motion.div>
+          )}
+
+          {activeTab === 'stats' && (
+            <motion.div key="stats" variants={containerVariants} initial="hidden" animate="show" exit="exit" className="bg-white rounded-[2rem] p-10 text-center shadow-sm border border-gray-100 flex flex-col items-center justify-center min-h-[400px]">
+              <div className="w-20 h-20 bg-green-50 text-green-500 rounded-2xl flex items-center justify-center mb-6">
+                <BarChart2 className="w-10 h-10" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Usage Statistics</h2>
+              <p className="text-gray-500 max-w-md mx-auto">Track which gestures you use the most and optimize your hand movements for maximum productivity.</p>
+            </motion.div>
+          )}
+          
+          {activeTab === 'settings' && (
+            <motion.div key="settings" variants={containerVariants} initial="hidden" animate="show" exit="exit" className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100 max-w-2xl">
+              <div className="flex items-center justify-between mb-8 pb-8 border-b border-gray-100">
+                <div>
+                  <h3 className="text-lg font-bold">Engine Status</h3>
+                  <p className="text-gray-500 text-sm">Pause or resume the background ML python daemon.</p>
+                </div>
+                <button onClick={handleToggleEngine} className={`px-6 py-3 rounded-full font-bold flex items-center space-x-2 transition-colors ${status?.is_active ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}>
+                  <Power className="w-5 h-5" />
+                  <span>{status?.is_active ? "Pause Engine" : "Resume Engine"}</span>
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold">Cooldown Threshold</h3>
+                  <p className="text-gray-500 text-sm">Time required between gesture recognitions.</p>
+                </div>
+                <div className="bg-gray-100 px-4 py-2 rounded-lg font-mono font-medium text-gray-700">
+                  {config?.settings?.cooldown || 1.0}s
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
       </main>
+
+      {/* Record Gesture Modal */}
+      <AnimatePresence>
+        {isRecordingModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !isRecordingInProgress && setIsRecordingModalOpen(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 relative z-10 shadow-2xl">
+              <button onClick={() => !isRecordingInProgress && setIsRecordingModalOpen(false)} className="absolute top-6 right-6 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+              
+              {!isRecordingInProgress ? (
+                <>
+                  <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center mb-6">
+                    <Video className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Record New Gesture</h2>
+                  <p className="text-gray-500 mb-6 text-sm">Give your gesture a name and get ready to perform it in front of the camera.</p>
+                  
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Gesture Name</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g., SwipeRight, PeaceSign" 
+                      value={gestureNameInput}
+                      onChange={(e) => setGestureNameInput(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-shadow"
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div className="bg-gray-50 p-4 rounded-xl mb-8 flex items-center justify-between border border-gray-100">
+                    <span className="text-sm font-medium text-gray-500">Action to trigger</span>
+                    <span className="font-bold text-black bg-white px-3 py-1 rounded-md shadow-sm border border-gray-200">{recordingAction}</span>
+                  </div>
+
+                  <button 
+                    onClick={startRecording}
+                    disabled={!gestureNameInput.trim()}
+                    className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    <Camera className="w-5 h-5" />
+                    <span>Start Recording</span>
+                  </button>
+                </>
+              ) : (
+                <div className="py-10 flex flex-col items-center justify-center text-center">
+                  <motion.div animate={{ scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity, duration: 1.5 }} className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(239,68,68,0.3)]">
+                    <Video className="w-10 h-10" />
+                  </motion.div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Perform Gesture Now</h2>
+                  <p className="text-gray-500">Look at the camera and perform <strong>'{gestureNameInput}'</strong>.</p>
+                  <p className="text-sm text-red-500 font-bold mt-6 animate-pulse">Recording 30 frames...</p>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Placeholder Macro Modal */}
+      <AnimatePresence>
+        {isMacroModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMacroModalOpen(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white w-full max-w-md rounded-[2rem] p-8 relative z-10 shadow-2xl text-center">
+              <div className="w-16 h-16 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Settings className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Macro Builder</h2>
+              <p className="text-gray-500 mb-6">The macro builder interface is currently in development. Check back in a future update!</p>
+              <button onClick={() => setIsMacroModalOpen(false)} className="bg-gray-100 text-gray-900 font-bold px-6 py-2.5 rounded-full hover:bg-gray-200 transition-colors">Close</button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
