@@ -1,11 +1,12 @@
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import config_manager
 import shared_state
 import json
 import os
-
+import time
 app = FastAPI(title="GestureOS API")
 
 app.add_middleware(
@@ -84,3 +85,19 @@ def get_status():
         "is_recording": shared_state.is_recording,
         "recording_gesture": shared_state.recording_gesture_name
     }
+
+async def generate_frames():
+    last_frame = None
+    while True:
+        frame = shared_state.latest_frame
+        if frame is not None and frame != last_frame:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            last_frame = frame
+        await asyncio.sleep(0.03)
+
+import asyncio
+
+@app.get("/api/video_feed")
+async def video_feed():
+    return StreamingResponse(generate_frames(), media_type="multipart/x-mixed-replace; boundary=frame")
